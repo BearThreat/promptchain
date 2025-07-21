@@ -38,18 +38,84 @@ The parser, located in `promptchain_parser.py`, is the cornerstone of this syste
 
 #### Example Walkthrough
 
-Let's trace the execution of the sample prompt chain:
+Let's trace the execution of a sample prompt chain to see how the parser and execution engine work together.
 
-1.  **Variable Initialization:** The parser first identifies the `Variables` section and defines a dictionary: `{"topic": "a new line of luxury watches"}`.
-2.  **First Prompt Step:**
-    *   The parser moves to the first prompt, named `Prompt 1`.
-    *   It sees the `[[topic]]` dependency and verifies that `topic` exists in its variables dictionary.
-    *   The `[[topic]]` placeholder is replaced with its value, and the resulting prompt is sent to the specified `model` (`openai/gpt-3.5-turbo`).
-3.  **Second Prompt Step:**
-    *   The parser proceeds to the next prompt, `Draft the body`.
-    *   It identifies two dependencies: `[[1]]` and `[[topic]]`.
-    *   `[[topic]]` is already known. `[[1]]` refers to the output of the first prompt step. The scheduler (`find_runnable_steps`) would have waited for the first prompt to complete before starting this one.
-    *   Once the first prompt's output is received, it's stored as variable `1`. Both placeholders are replaced, and the second prompt is executed.
+**The Full `promptchain.md` File:**
+```markdown
+## Variables
+- topic: a new line of luxury watches
+
+### Prompt 1
+Write a short, punchy headline for [[topic]].
+
+## Metadata
+- model: openai/gpt-3.5-turbo
+- temperature: 0.7
+
+### Draft the body
+[[1]]
+
+Write a 100-word description of [[topic]].
+```
+
+---
+
+**Step 1: Variable Initialization**
+
+The parser first processes the `## Variables` section.
+
+*   **Code Block:**
+    ```markdown
+    ## Variables
+    - topic: a new line of luxury watches
+    ```
+*   **Action:** It creates an internal dictionary of variables, resulting in: `{"topic": "a new line of luxury watches"}`.
+
+---
+
+**Step 2: First Prompt Execution (`Prompt 1`)**
+
+The engine's scheduler (`find_runnable_steps`) sees that `Prompt 1` has one dependency, `[[topic]]`, which is available. It proceeds to execute this step.
+
+*   **Code Block:**
+    ```markdown
+    ### Prompt 1
+    Write a short, punchy headline for [[topic]].
+
+    ## Metadata
+    - model: openai/gpt-3.5-turbo
+    - temperature: 0.7
+    ```
+*   **LLM Input:** The `[[topic]]` placeholder is replaced, and the following prompt is sent to the model:
+    ```
+    Write a short, punchy headline for a new line of luxury watches.
+    ```
+*   **LLM Settings:**
+    *   `model`: `openai/gpt-3.5-turbo`
+    *   `temperature`: `0.7`
+
+---
+
+**Step 3: Second Prompt Execution (`Draft the body`)**
+
+The scheduler now checks the dependencies for the `Draft the body` step: `[[1]]` and `[[topic]]`. It waits for the first prompt to complete. Once the LLM returns the headline (e.g., "Timeless Elegance, Redefined."), that output is stored as the variable `1`. Now that all dependencies are met, the second step runs.
+
+*   **Code Block:**
+    ```markdown
+    ### Draft the body
+    [[1]]
+
+    Write a 100-word description of [[topic]].
+    ```
+*   **LLM Input:** Both placeholders are replaced with their respective values:
+    ```
+    Timeless Elegance, Redefined.
+
+    Write a 100-word description of a new line of luxury watches.
+    ```
+*   **LLM Settings:** This step has no `## Metadata` section, so it **inherits** the settings from the previous step.
+    *   `model`: `openai/gpt-3.5-turbo`
+    *   `temperature`: `0.7`
 
 This step-by-step, dependency-aware process allows for the creation of intricate and powerful workflows from a simple, readable Markdown file.
 
