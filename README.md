@@ -22,9 +22,37 @@ Savant transforms a simple classification analysis tool into a powerful creative
 
 ### 2. Custom DAG-based Prompt Chaining Engine
 
-At the heart of Savant is a custom-built Directed Acyclic Graph (DAG) execution engine. This system parses a domain-specific Markdown format to define complex prompt dependencies, allowing the output of one LLM call to be used as a variable input for subsequent calls.
+At the heart of Savant is a custom-built Directed Acyclic Graph (DAG) execution engine. This system parses a domain-specific Markdown format (`promptchain.md`) to define complex prompt dependencies, allowing the output of one LLM call to be used as a variable input for subsequent calls.
 
--   **Engineered a custom Directed Acyclic Graph (DAG) execution engine from the ground up, parsing a domain-specific Markdown format to define complex prompt dependencies. The engine's scheduler (`find_runnable_steps` in `promptchain_parser.py`) identifies parallelizable tasks, enabling non-blocking, concurrent API calls that significantly minimize generation latency.**
+#### The Promptchain Markdown Parser
+
+The parser, located in `promptchain_parser.py`, is the cornerstone of this system. It was designed with a critical goal: to create a Domain-Specific Language (DSL) that is both **human-readable** and **robustly parsable**. This allows non-technical users, like copywriters, to design, modify, and execute complex, multi-step creative workflows without writing a single line of code.
+
+**Key Design Choices & Reasoning:**
+
+*   **Markdown as a DSL:** Markdown was chosen for its simplicity and readability. The use of `###` for section separation and `-` for key-value pairs is intuitive and requires no special training. This lowers the barrier to entry for creating sophisticated prompt chains.
+*   **Simple Variable Substitution:** The `[[variable_name]]` syntax is intentionally simple and visually distinct. The parser enforces a "varized" format (lowercase, underscores for spaces) to prevent ambiguity and ensure reliable substitution. This design avoids complex templating languages that would increase the learning curve.
+*   **DAG-based Execution & Scheduling:** The parser doesn't just read the file; it builds a Directed Acyclic Graph representing the dependencies between prompts. The `find_runnable_steps` function acts as a scheduler, identifying all steps whose variable dependencies have been met. This is crucial for performance, as it allows independent prompt steps to be executed concurrently, minimizing the total time-to-completion for a chain.
+*   **Implicit Metadata Inheritance:** To reduce redundancy, metadata (like the `model` or `temperature`) only needs to be defined once in the first prompt step. Subsequent steps automatically inherit these settings unless explicitly overridden. This keeps the Markdown clean and focused on the creative task at hand.
+*   **Robust Error Handling:** The parser validates the chain before execution. It checks for missing variables at each step, preventing runtime failures and providing clear, actionable error messages to the user.
+
+#### Example Walkthrough
+
+Let's trace the execution of the sample prompt chain:
+
+1.  **Variable Initialization:** The parser first identifies the `Variables` section and defines a dictionary: `{"topic": "a new line of luxury watches"}`.
+2.  **First Prompt Step:**
+    *   The parser moves to the first prompt, named `Prompt 1`.
+    *   It sees the `[[topic]]` dependency and verifies that `topic` exists in its variables dictionary.
+    *   The `[[topic]]` placeholder is replaced with its value, and the resulting prompt is sent to the specified `model` (`openai/gpt-3.5-turbo`).
+3.  **Second Prompt Step:**
+    *   The parser proceeds to the next prompt, `Draft the body`.
+    *   It identifies two dependencies: `[[1]]` and `[[topic]]`.
+    *   `[[topic]]` is already known. `[[1]]` refers to the output of the first prompt step. The scheduler (`find_runnable_steps`) would have waited for the first prompt to complete before starting this one.
+    *   Once the first prompt's output is received, it's stored as variable `1`. Both placeholders are replaced, and the second prompt is executed.
+
+This step-by-step, dependency-aware process allows for the creation of intricate and powerful workflows from a simple, readable Markdown file.
+
 -   **Implementation:** The logic for parsing the Markdown format and constructing the dependency graph is located in [`promptchain_parser.py`](./promptchain_parser.py). The `find_runnable_steps` function within this file is the core of the DAG scheduler, identifying which prompt steps can be executed in parallel. The execution of the prompt chain is handled by [`promptchain.py`](./promptchain.py).
 
     ```python
@@ -70,17 +98,30 @@ To further enhance marketing workflows, Savant includes a BERT-based classificat
     pip install -r requirements.txt
     ```
 2.  **Set up Environment Variables:**
-    Create a `.env` file in the root of the project and add the following:
+    Create a `.env` file in the root of the project. This file stores sensitive credentials and configuration settings. Below is a more complete example:
     ```
-    SLACK_TOKEN=xoxb-...
-    WEBSOCKET_TOKEN=xapp-...
+    # Slack API Tokens
+    SLACK_TOKEN=xoxb-YOUR_SLACK_BOT_TOKEN
+    WEBSOCKET_TOKEN=xapp-YOUR_SLACK_APP_LEVEL_TOKEN
+
+    # LLM Provider API Keys
+    OPENROUTER_API_KEY=sk-or-v1-YOUR_OPENROUTER_KEY
+    # OPENAI_API_KEY=sk-YOUR_OPENAI_KEY # (Optional, if using OpenAI directly)
+
+    # Other Configurations
+    # Add any other necessary environment variables here
     ```
 3.  **Run the Server:**
+    For detailed instructions on running the server, see [`cmds.md`](./cmds.md).
     ```bash
     python async_server.py
     ```
-4.  **Create a Prompt Chain:**
-    Create a file named `my_prompt_chain.md` with the following content:
+4.  **Create and Submit a Prompt Chain:**
+    Create a file named `my_prompt_chain.md` with your desired workflow.
+
+    **A Note on the Slack UI:** The current method for submitting prompt chains is through a basic UI in the Slack channel where the bot resides. This UI was developed early in the project as a pragmatic way to distribute useful functionality to coworkers. While effective, it has its limitations and was built with limited UI development experience.
+
+    Here is an example `promptchain.md`:
     ```markdown
     ## Variables
     - topic: a new line of luxury watches
@@ -96,8 +137,7 @@ To further enhance marketing workflows, Savant includes a BERT-based classificat
 
     Write a 100-word description of [[topic]].
     ```
-5.  **Trigger the Job:**
-    In Slack, use the `/savant` command to trigger the prompt chain.
+    Submit this file through the UI in your Slack channel to trigger the job.
 
 ## Prompt Chain Samples
 
