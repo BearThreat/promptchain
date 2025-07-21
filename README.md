@@ -93,6 +93,10 @@ The engine's scheduler (`find_runnable_steps`) sees that `Prompt 1` has one depe
 *   **LLM Settings:**
     *   `model`: `openai/gpt-3.5-turbo`
     *   `temperature`: `0.7`
+*   **LLM Output (Example):**
+    ```
+    Timeless Elegance, Redefined.
+    ```
 
 ---
 
@@ -116,6 +120,10 @@ The scheduler now checks the dependencies for the `Draft the body` step: `[[1]]`
 *   **LLM Settings:** This step has no `## Metadata` section, so it **inherits** the settings from the previous step.
     *   `model`: `openai/gpt-3.5-turbo`
     *   `temperature`: `0.7`
+*   **LLM Output (Example):**
+    ```
+    Discover the pinnacle of craftsmanship with our new collection of luxury watches. Each timepiece is a testament to a legacy of precision engineering and sophisticated design. Meticulously crafted from the finest materials, these watches are more than just an accessory—they are a statement of enduring style and an heirloom for generations to come. Experience the art of timekeeping, perfected.
+    ```
 
 This step-by-step, dependency-aware process allows for the creation of intricate and powerful workflows from a simple, readable Markdown file.
 
